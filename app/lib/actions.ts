@@ -5,6 +5,9 @@ import postgres from 'postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
+
 
 const FormSchema = z.object({
   id: z.string(),
@@ -16,6 +19,28 @@ const FormSchema = z.object({
 
 const CreateInvoice = FormSchema.omit({ id: true, date: true });
 const UpdateInvoice = FormSchema.omit({ id: true, date: true });
+
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData,
+) {
+  let responseRedirectUrl = null;
+  try {
+    console.log('formData', formData);
+    responseRedirectUrl = await signIn('credentials', {
+      ...Object.fromEntries(formData),
+      redirect: false,
+    });
+  } catch (error) {
+    console.log('error', error);
+    if ((error as Error).message.includes('CredentialsSignin')) {
+      return 'CredentialSignin';
+    }
+    throw error;
+  } finally {
+    if (responseRedirectUrl) redirect(responseRedirectUrl);
+  }
+}
 
 export async function createInvoice(formData: FormData) {
   const { customerId, amount, status } = CreateInvoice.parse({
